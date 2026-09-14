@@ -105,9 +105,9 @@ class Variable:
         self.celdas=celdas
         self.fila=celdas[0][0]
         self.col=celdas[0][1]
-        self.longitud=len(celdas)
         self.dominio=dominio
         self.restricciones=[]
+        self.valor=None
 
     def __str__(self):
         tipo='horizontal' if self.tipo=='h' else 'vertical'
@@ -127,34 +127,6 @@ def recorreTablero(tablero, celdas):
         trozosHueco.append(aux)
     return trozosHueco
 
-def creaVariables(tablero, almacen):
-    variables=[]
-    filas=tablero.getAlto()
-    cols=tablero.getAncho()
-
-    # horizontales: cada tramo de cada fila
-    for f in range(filas):
-        fila=[(f, c) for c in range(cols)]
-        for tramo in recorreTablero(tablero, fila):
-            variables.append(Variable(len(variables), 'h', tramo, palabraCabe(tablero, almacen, tramo)))
-
-    # verticales: cada tramo de cada columna, solo si tiene 2 o más celdas
-    for c in range(cols):
-        columna=[(f, c) for f in range(filas)]
-        for tramo in recorreTablero(tablero, columna):
-            if len(tramo)>=2:
-                variables.append(Variable(len(variables), 'v', tramo, palabraCabe(tablero, almacen, tramo)))
-
-    # restricciones: si una horizontal y una vertical comparten una celda, se cruzan ahí
-    for v1 in variables:
-        for v2 in variables:
-            if v1.tipo!=v2.tipo:
-                for celda in v1.celdas:
-                    if celda in v2.celdas:
-                        v1.restricciones.append((v2, v1.celdas.index(celda), v2.celdas.index(celda)))
-
-    return variables
-
 def palabraCabe(tablero, almacen, celdas):
     dominio=[]
     for pal in sorted(almacen.get(len(celdas), [])):
@@ -168,9 +140,47 @@ def palabraCabe(tablero, almacen, celdas):
             dominio.append(pal)
     return dominio
 
+def creaVariables(tablero, almacen):
+    variables=[]
+    filas=tablero.getAlto()
+    cols=tablero.getAncho()
+
+    for f in range(filas):
+        fila=[]
+        for c in range(cols):
+            fila.append((f, c))
+        for tramo in recorreTablero(tablero, fila):
+            variables.append(Variable(len(variables), 'h', tramo, palabraCabe(tablero, almacen, tramo)))
+
+    for c in range(cols):
+        columna=[]
+        for f in range(filas):
+            columna.append((f, c))
+        for tramo in recorreTablero(tablero, columna):
+            if len(tramo)>=2:
+                variables.append(Variable(len(variables), 'v', tramo, palabraCabe(tablero, almacen, tramo)))
+
+    for v1 in variables:
+        for v2 in variables:
+            if v1.tipo!=v2.tipo:
+                for celda in v1.celdas:
+                    if celda in v2.celdas:
+                        v1.restricciones.append((v2, v1.celdas.index(celda), v2.celdas.index(celda)))
+
+    return variables
+
 def imprimeVariables(variables):
     for v in variables:
         print(v)
+
+def backtracking(variables, asignacion):
+    if len(asignacion)==len(variables):
+        return TRUE
+
+    
+
+    
+
 
 #########################################################################  
 # Principal
@@ -203,18 +213,16 @@ def main():
     pygame.display.set_caption("Practica 1: Crucigrama")    
      
     #La altura del botón depende del tamaño de la ventana pero hay una altura máxima
-    altoBoton=altoVentana//5    
+    altoBoton=altoVentana//6
     if altoBoton>=65:
-        altoBoton=65    
-    
-    posBotBK=altoVentana//1-altoBoton//2
-    posBotFC=altoVentana//2-altoBoton//2
-    posBotAC3=(altoVentana//2+altoVentana)//2-altoBoton//2     
-    postBotVR= altoVentana//4-altoBoton//2
-    botBK=pygame.Rect(anchoVentana-95, posBotBK, 70, altoBoton)    
-    botFC=pygame.Rect(anchoVentana-95,posBotFC , 70, altoBoton)
-    botAC3=pygame.Rect(anchoVentana-95, posBotAC3, 70, altoBoton)
-    botVR=pygame.Rect(anchoVentana-95, postBotVR, 70, altoBoton)
+        altoBoton=65
+        
+    hueco=(altoVentana-4*altoBoton)//5
+    xBoton=anchoVentana-95
+    botBK=pygame.Rect(xBoton, hueco, 70, altoBoton)
+    botFC=pygame.Rect(xBoton, 2*hueco+altoBoton, 70, altoBoton)
+    botAC3=pygame.Rect(xBoton, 3*hueco+2*altoBoton, 70, altoBoton)
+    botVR=pygame.Rect(xBoton, 4*hueco+3*altoBoton, 70, altoBoton)
     
 
     tamFuenteBot=int(altoBoton//1.5)    
