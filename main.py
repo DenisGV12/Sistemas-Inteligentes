@@ -150,7 +150,8 @@ def creaVariables(tablero, almacen):
         for c in range(cols):
             fila.append((f, c))
         for tramo in recorreTablero(tablero, fila):
-            variables.append(Variable(len(variables), 'h', tramo, palabraCabe(tablero, almacen, tramo)))
+            if len(tramo)>=2:
+                variables.append(Variable(len(variables), 'h', tramo, palabraCabe(tablero, almacen, tramo)))
 
     for c in range(cols):
         columna=[]
@@ -171,15 +172,21 @@ def creaVariables(tablero, almacen):
 
 def imprimeVariables(variables):
     for v in variables:
-        print(v)
-
-def backtracking(variables, asignacion):
-    if len(asignacion)==len(variables):
-        return TRUE
-
+        print(v)    
     
+def test(Vk, valor, )):
 
-    
+
+def limpiaValores(variables):
+    for v in variables:
+        v.valor=None
+
+def escribeSolucion(tablero, variables):
+    for v in variables:
+        for i, (f, c) in enumerate(v.celdas):
+            tablero.setCelda(f, c, v.valor[i])
+
+def backtracking(variables, index):
 
 
 #########################################################################  
@@ -234,6 +241,7 @@ def main():
     game_over=False
     tablero=Tablero(filas, cols)    
     ac3=False
+    variables=None
     while not game_over:
         for event in pygame.event.get():
             if event.type==pygame.QUIT:               
@@ -243,11 +251,19 @@ def main():
                 pos=pygame.mouse.get_pos()                
                 if pulsaBoton(pos, botBK):
                     print('BK')
-                    variables=creaVariables(tablero, almacen)
+                    if not ac3 or variables is None:
+                        variables=creaVariables(tablero, almacen)
+                    limpiaValores(variables)
                     imprimeVariables(variables)
-                    res=True #esta variable debe estar a falso si el problema no tiene solución
+                    inicio=time.perf_counter()
+                    res=backtracking(variables, 0)
+                    fin=time.perf_counter()
+                    print(f'Tiempo BK: {fin-inicio:.6f} s')
+                    ac3=False
                     if res==False:
-                            MessageBox.showwarning("Alerta", "No hay solución")                     
+                        MessageBox.showwarning("Alerta", "No hay solución")
+                    else:
+                        escribeSolucion(tablero, variables)
                 elif pulsaBoton(pos, botFC):
                     print('FC')
                     variables=creaVariables(tablero, almacen)
