@@ -108,6 +108,7 @@ class Variable:
         self.dominio=dominio
         self.restricciones=[]
         self.valor=None
+        self.podado=[]
 
     def __str__(self):
         tipo='horizontal' if self.tipo=='h' else 'vertical'
@@ -205,6 +206,47 @@ def escribeSolucion(tablero, variables):
         for i, (f, c) in enumerate(v.celdas):
             tablero.setCelda(f, c, v.valor[i])
 
+def es_consistente(Vi, a, Vj, b):
+    if a == b:
+        return False
+    for otra, posVi, posOtra in Vi.restricciones:
+        if otra is Vj and a[posVi] != b[posOtra]:
+            return False
+    return True
+
+def Forward(i, a, variable):
+    dominio_vacio = False
+    for j in range(i+1, len(variable)):
+        for b in list(variable[j].dominio):
+            if not es_consistente(variable[i], a, variable[j], b):
+                variable[j].dominio.remove(b)
+                variable[j].podado.append((b, i))
+            if variable[j].dominio == []:
+                dominio_vacio = True
+                break
+        if dominio_vacio:
+            return False
+    return True
+
+def Restaurar(i, variable):
+    for j in range(i+1, len(variable)):
+        for b in list(variable[j].podado):
+            if b[1] == i:
+                variable[j].podado.remove(b)
+                variable[j].dominio.append(b[0])
+
+def FC(i,variable):
+    for a in variable[i].dominio:
+        variable[i].valor=a
+        if i == len(variable)-1:
+            return True
+        else:
+            if Forward(i,a,variable):
+                if FC(i+1,variable):
+                    return True
+            Restaurar(i,variable)
+    variable[i].valor=None
+    return False
 
 #########################################################################  
 # Principal
@@ -278,9 +320,10 @@ def main():
                     print('FC')
                     variables=creaVariables(tablero, almacen)
                     imprimeVariables(variables)
-                    res=True #esta variable debe estar a falso si el problema no tiene solución               
+                    res=FC(0,variables) #esta variable debe estar a falso si el problema no tiene solución               
                     if res==False:
                         MessageBox.showwarning("Alerta", "No hay solución")  
+                    escribeSolucion(tablero,variables)
                 elif pulsaBoton(pos, botAC3):
                     print('AC3')
                     variables=creaVariables(tablero, almacen)
