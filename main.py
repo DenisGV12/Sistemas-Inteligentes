@@ -248,6 +248,24 @@ def FC(i,variable):
     variable[i].valor=None
     return False
 
+def guardaCrucigrama(tablero):
+    f=open('crucigrama.txt', 'w')
+    f.write(str(tablero))
+    f.close()
+    print('Crucigrama guardado')
+
+def cargaCrucigrama(tablero):
+    try:
+        f=open('crucigrama.txt', 'r')
+        lineas=f.read().split()
+        f.close()
+        for fil in range(tablero.getAlto()):
+            for col in range(tablero.getAncho()):
+                tablero.setCelda(fil, col, lineas[fil][col])
+        print('Crucigrama cargado')
+    except (FileNotFoundError, IndexError):
+        MessageBox.showwarning("Alerta", "No hay crucigrama guardado de este tamaño")
+
 #########################################################################  
 # Principal
 #########################################################################
@@ -273,7 +291,7 @@ def main():
         file='d0.txt'    
         
     anchoVentana=cols*(TAM+MARGEN)+MARGEN_DERECHO
-    altoVentana= filas*(TAM+MARGEN)+2*MARGEN 
+    altoVentana= filas*(TAM+MARGEN)+2*MARGEN + 50
     dimension=[anchoVentana,altoVentana]
     screen=pygame.display.set_mode(dimension) 
     pygame.display.set_caption("Practica 1: Crucigrama")    
@@ -289,7 +307,8 @@ def main():
     botFC=pygame.Rect(xBoton, 2*hueco+altoBoton, 70, altoBoton)
     botAC3=pygame.Rect(xBoton, 3*hueco+2*altoBoton, 70, altoBoton)
     botVR=pygame.Rect(xBoton, 4*hueco+3*altoBoton, 70, altoBoton)
-    
+    botGuardar=pygame.Rect(MARGEN, altoVentana-45, 100, 40)
+    botCargar=pygame.Rect(MARGEN+110, altoVentana-45, 100, 40)
 
     tamFuenteBot=int(altoBoton//1.5)    
     fuenteBot=pygame.font.Font(None, tamFuenteBot)
@@ -322,8 +341,9 @@ def main():
                     imprimeVariables(variables)
                     res=FC(0,variables) #esta variable debe estar a falso si el problema no tiene solución               
                     if res==False:
-                        MessageBox.showwarning("Alerta", "No hay solución")  
-                    escribeSolucion(tablero,variables)
+                        MessageBox.showwarning("Alerta", "No hay solución")
+                    else:
+                        escribeSolucion(tablero,variables)
                 elif pulsaBoton(pos, botAC3):
                     print('AC3')
                     variables=creaVariables(tablero, almacen)
@@ -331,7 +351,11 @@ def main():
                 elif pulsaBoton(pos, botVR):
                     print('VAR')
                     variables=creaVariables(tablero, almacen)
-                    imprimeVariables(variables)         
+                    imprimeVariables(variables)
+                elif pulsaBoton(pos, botGuardar):
+                    guardaCrucigrama(tablero)
+                elif pulsaBoton(pos, botCargar):
+                    cargaCrucigrama(tablero)    
                 elif inTablero(pos, filas, cols):
                     colDestino=pos[0]//(TAM+MARGEN)
                     filDestino=pos[1]//(TAM+MARGEN)                    
@@ -352,7 +376,9 @@ def main():
         pintarBoton(screen, fuenteBot, botBK, "BK")
         pintarBoton(screen, fuenteBot, botFC, "FC")
         pintarBoton(screen, fuenteBot, botAC3, "AC3")
-        pintarBoton(screen, fuenteBot, botVR, "Variables")  
+        pintarBoton(screen, fuenteBot, botVR, "Variables")
+        pintarBoton(screen, fuenteBot, botGuardar, "Guardar")
+        pintarBoton(screen, fuenteBot, botCargar, "Cargar")
         #actualizar pantalla
         pygame.display.flip()
         reloj.tick(40)
