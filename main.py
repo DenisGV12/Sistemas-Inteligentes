@@ -316,6 +316,40 @@ def cargaCrucigrama(tablero):
             tablero.setCelda(fil, col, lineas[fil][col])
     print('Crucigrama cargado')
 
+def AC3(Q):
+    while Q:
+        Vk,Vm = Q.pop(0)
+        cambio = False
+        for d in list(Vk.dominio):
+            aux = False
+            for vm in Vm.dominio:
+                if es_consistente(Vk, d, Vm, vm):
+                    aux = True
+                    break
+            if not aux:
+                Vk.dominio.remove(d)
+                cambio = True
+        if not Vk.dominio:
+            return False
+        if cambio == True:
+            for r in Vk.restricciones:
+                Vi = r[0]
+                if Vi is not Vm and (Vi, Vk) not in Q:
+                    Q.append((Vi,Vk))
+    return True
+
+def creaCola(variables):
+    Q = []
+    for v in variables:
+        for r in v.restricciones:
+            Q.append((v, r[0]))
+    return Q
+
+def aplicaDominiosAC3(variables, dominiosAC3, fotoAC3, tablero):
+    if dominiosAC3 is not None and fotoAC3 == str(tablero) and len(dominiosAC3) == len(variables):
+        for v, d in zip(variables, dominiosAC3):
+            v.dominio = list(d)
+
 #########################################################################  
 # Principal
 #########################################################################
@@ -369,7 +403,8 @@ def main():
     #imprimeAlmacen(almacen)
     game_over=False
     tablero=Tablero(filas, cols)    
-    ac3=False
+    dominiosAC3 = None
+    fotoAC3 = None
     while not game_over:
         for event in pygame.event.get():
             if event.type==pygame.QUIT:               
@@ -380,6 +415,7 @@ def main():
                 if pulsaBoton(pos, botBK):
                     print('BK')
                     variables=creaVariables(tablero, almacen)
+                    aplicaDominiosAC3(variables, dominiosAC3, fotoAC3, tablero)
                     imprimeVariables(variables)
                     inicio=time.time() #apuntamos cuando empieza
                     res=backtracking(variables,0) #empezamos por la primera variable
@@ -392,6 +428,7 @@ def main():
                 elif pulsaBoton(pos, botFC):
                     print('FC')
                     variables=creaVariables(tablero, almacen)
+                    aplicaDominiosAC3(variables, dominiosAC3, fotoAC3, tablero)
                     imprimeVariables(variables)
                     inicio=time.time() #apuntamos cuando empieza
                     res=FC(0,variables) #esta variable debe estar a falso si el problema no tiene solución
@@ -404,7 +441,26 @@ def main():
                 elif pulsaBoton(pos, botAC3):
                     print('AC3')
                     variables=creaVariables(tablero, almacen)
+                    print('DOMINIOS ANTES DEL AC3')
                     imprimeVariables(variables)
+                    Q = creaCola(variables)
+                    inicio=time.time()
+                    res = AC3(Q)
+                    fin=time.time()
+                    print(f'Tiempo AC3: {fin-inicio:.4f} segundos')
+                    print('DOMINIOS DESPUES DEL AC3')
+                    imprimeVariables(variables)
+                    if res==False:
+                        dominiosAC3=None
+                        fotoAC3=None
+                        MessageBox.showwarning("Alerta", "No hay solución")
+                    else:
+                        dominiosAC3 = []
+                        for v in variables:
+                            copia = list(v.dominio)
+                            dominiosAC3.append(copia)
+                        fotoAC3=str(tablero)
+
                 elif pulsaBoton(pos, botVR):
                     print('VAR')
                     variables=creaVariables(tablero, almacen)
