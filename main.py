@@ -350,6 +350,46 @@ def aplicaDominiosAC3(variables, dominiosAC3, fotoAC3, tablero):
         for v, d in zip(variables, dominiosAC3):
             v.dominio = list(d)
 
+def variablesConflicto(Variables, index):
+    Vk = Variables[index]
+    conflictos = set()
+    for i in range(index):
+        if Variables[i].valor == Vk.valor:
+            conflictos.add(i)
+
+    for otra, posVk, posOtra in Vk.restricciones:
+        if otra.nombre < index and Vk.valor[posVk] != otra.valor[posOtra]:
+            conflictos.add(otra.nombre)
+    return conflictos
+
+def backjumping(Variables, index):
+    if index == len(Variables):
+        return True, set()
+
+    Vk = Variables[index]
+    conflictos_k = set()
+    for v in Vk.dominio:
+        Vk.valor = v
+        conflictosVk = variablesConflicto(Variables, index)
+
+        if not conflictosVk:
+            exito, conflictos = backjumping(Variables, index + 1)
+
+            if exito:
+                return True, set()
+            if index not in conflictos:
+                Vk.valor = None
+                return False, conflictos
+            else:
+                conflictos_k = conflictos_k.union(conflictos - {index})
+        else:
+            conflictos_k = conflictos_k.union(conflictosVk)
+
+        Vk.valor = None
+
+    return False, conflictos_k.union({index})
+    
+
 #########################################################################  
 # Principal
 #########################################################################
@@ -383,17 +423,18 @@ def main():
     #La altura del botón depende del tamaño de la ventana pero hay una altura máxima
     altoBoton=altoVentana//6
     if altoBoton>=65:
-        altoBoton=65
+        altoBoton=85
         
     hueco=(altoVentana-4*altoBoton)//5
     xBoton=anchoVentana-95
     botBK=pygame.Rect(xBoton, hueco, 70, altoBoton)
     botFC=pygame.Rect(xBoton, 2*hueco+altoBoton, 70, altoBoton)
     botAC3=pygame.Rect(xBoton, 3*hueco+2*altoBoton, 70, altoBoton)
-    botVR=pygame.Rect(xBoton, 4*hueco+3*altoBoton, 70, altoBoton)
+    botBJ=pygame.Rect(xBoton, 5*hueco+2*altoBoton, 70, altoBoton)
+    botVR=pygame.Rect(xBoton, 5*hueco+3*altoBoton, 70, altoBoton)
     #botones de guardar y cargar abajo a la izquierda
-    botGuardar=pygame.Rect(MARGEN, altoVentana-45, 100, 40)
-    botCargar=pygame.Rect(MARGEN+110, altoVentana-45, 100, 40)
+    botGuardar=pygame.Rect(MARGEN+30, altoVentana-45, 100, 40)
+    botCargar=pygame.Rect(MARGEN+200, altoVentana-45, 100, 40)
 
     tamFuenteBot=int(altoBoton//1.5)    
     fuenteBot=pygame.font.Font(None, tamFuenteBot)
@@ -461,6 +502,20 @@ def main():
                             dominiosAC3.append(copia)
                         fotoAC3=str(tablero)
 
+                elif pulsaBoton(pos, botBJ):
+                    print('BJ')
+                    variables=creaVariables(tablero, almacen)
+                    aplicaDominiosAC3(variables, dominiosAC3, fotoAC3, tablero)
+                    imprimeVariables(variables)
+                    inicio=time.time() #apuntamos cuando empieza
+                    res=backjumping(variables,0) #esta variable debe estar a falso si el problema no tiene solución
+                    fin=time.time() #y cuando acaba
+                    print(f'Tiempo FC: {fin-inicio:.4f} segundos') #mostramos lo que ha tardado
+                    if res==False:
+                        MessageBox.showwarning("Alerta", "No hay solución")
+                    else:
+                        escribeSolucion(tablero,variables)
+
                 elif pulsaBoton(pos, botVR):
                     print('VAR')
                     variables=creaVariables(tablero, almacen)
@@ -489,6 +544,7 @@ def main():
         pintarBoton(screen, fuenteBot, botBK, "BK")
         pintarBoton(screen, fuenteBot, botFC, "FC")
         pintarBoton(screen, fuenteBot, botAC3, "AC3")
+        pintarBoton(screen, fuenteBot, botBJ, "BJ")
         pintarBoton(screen, fuenteBot, botVR, "Variables")
         pintarBoton(screen, fuenteBot, botGuardar, "Guardar")
         pintarBoton(screen, fuenteBot, botCargar, "Cargar")
