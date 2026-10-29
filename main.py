@@ -353,11 +353,12 @@ def aplicaDominiosAC3(variables, dominiosAC3, fotoAC3, tablero):
 def variablesConflicto(Variables, index):
     Vk = Variables[index]
     conflictos = set()
-    for i in range(index):
+
+    for i in range(index): #Mira si alguan palabra anterior ya tiene asignada la palabra del domino que se esta mirando ahora
         if Variables[i].valor == Vk.valor:
             conflictos.add(i)
 
-    for otra, posVk, posOtra in Vk.restricciones:
+    for otra, posVk, posOtra in Vk.restricciones: #Compruba que la letra de la palbra guardada en una variable anterior coincide con la qu se esta probando ahora
         if otra.nombre < index and Vk.valor[posVk] != otra.valor[posOtra]:
             conflictos.add(otra.nombre)
     return conflictos
@@ -368,26 +369,27 @@ def backjumping(Variables, index):
 
     Vk = Variables[index]
     conflictos_k = set()
-    for v in Vk.dominio:
+
+    for v in Vk.dominio: #Prueba una a una todas las palabras del domino de la variable actual
         Vk.valor = v
         conflictosVk = variablesConflicto(Variables, index)
 
-        if not conflictosVk:
-            exito, conflictos = backjumping(Variables, index + 1)
+        if not conflictosVk: #Caso de los conflictos este vacío
+            exito, conflictos = backjumping(Variables, index + 1) #Pasa a la siguiente variable porque se ha asignado un valor
 
             if exito:
-                return True, set()
-            if index not in conflictos:
+                return True, set() #Todas las varaibles se le ha asignado un valor
+            if index not in conflictos: #Si la variable no esta en los conflicto, vuelve atrás
                 Vk.valor = None
                 return False, conflictos
             else:
-                conflictos_k = conflictos_k.union(conflictos - {index})
+                conflictos_k = conflictos_k.union(conflictos - {index}) #Se quita el indice actual, para volver a probar otra palabra del domino de la variable actual
         else:
             conflictos_k = conflictos_k.union(conflictosVk)
 
-        Vk.valor = None
+        Vk.valor = None # Se desasigna el valor que se probaba
 
-    return False, conflictos_k.union({index})
+    return False, conflictos_k.union({index}) # Fallo a la hroa de asignar y devuelve los conflictos actuales mas el indice que se prueba
     
 
 #########################################################################  
@@ -425,13 +427,13 @@ def main():
     if altoBoton>=65:
         altoBoton=85
         
-    hueco=(altoVentana-4*altoBoton)//5
+    hueco=(altoVentana-5*altoBoton)//6
     xBoton=anchoVentana-95
     botBK=pygame.Rect(xBoton, hueco, 70, altoBoton)
     botFC=pygame.Rect(xBoton, 2*hueco+altoBoton, 70, altoBoton)
     botAC3=pygame.Rect(xBoton, 3*hueco+2*altoBoton, 70, altoBoton)
-    botBJ=pygame.Rect(xBoton, 5*hueco+2*altoBoton, 70, altoBoton)
-    botVR=pygame.Rect(xBoton, 5*hueco+3*altoBoton, 70, altoBoton)
+    botBJ=pygame.Rect(xBoton, 4*hueco+3*altoBoton, 70, altoBoton)
+    botVR=pygame.Rect(xBoton, 5*hueco+4*altoBoton, 70, altoBoton)
     #botones de guardar y cargar abajo a la izquierda
     botGuardar=pygame.Rect(MARGEN+30, altoVentana-45, 100, 40)
     botCargar=pygame.Rect(MARGEN+200, altoVentana-45, 100, 40)
@@ -508,9 +510,9 @@ def main():
                     aplicaDominiosAC3(variables, dominiosAC3, fotoAC3, tablero)
                     imprimeVariables(variables)
                     inicio=time.time() #apuntamos cuando empieza
-                    res=backjumping(variables,0) #esta variable debe estar a falso si el problema no tiene solución
+                    res,_=backjumping(variables,0) #esta variable debe estar a falso si el problema no tiene solución
                     fin=time.time() #y cuando acaba
-                    print(f'Tiempo FC: {fin-inicio:.4f} segundos') #mostramos lo que ha tardado
+                    print(f'Tiempo BJ: {fin-inicio:.4f} segundos') #mostramos lo que ha tardado
                     if res==False:
                         MessageBox.showwarning("Alerta", "No hay solución")
                     else:
