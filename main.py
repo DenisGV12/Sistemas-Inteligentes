@@ -22,6 +22,8 @@ TAM=60  #tamaño de la celda
 LLENA='*' 
 VACIA='-'
 
+HEURISTICA='Grado'
+
 #########################################################################
 # Detecta si se pulsa un botón
 #########################################################################   
@@ -175,7 +177,21 @@ def creaVariables(tablero, almacen):
                     if celda in v2.celdas:
                         v1.restricciones.append((v2, v1.celdas.index(celda), v2.celdas.index(celda)))
 
-    return variables
+    if HEURISTICA=='Ninguna':
+        return variables
+    if HEURISTICA=='MRV':
+        return ordenaMRV(variables)
+
+    #Grado (la que se usa por defecto): primero las variables con más cruces
+    ordenadas=[]
+    for n in range(len(variables), -1, -1):
+        for v in variables:
+            if len(v.restricciones)==n:
+                ordenadas.append(v)
+    for i in range(len(ordenadas)):
+        ordenadas[i].nombre=i
+
+    return ordenadas
 
 #Imprime las variables en el propio tablero
 def imprimeVariables(variables):
@@ -259,6 +275,8 @@ def Restaurar(i, variable):
 
 #forward checking
 def FC(i,variable):
+    if not variable:
+        return True
     for a in variable[i].dominio:
         variable[i].valor=a
         #si es la ultima variable ya esta
@@ -316,7 +334,10 @@ def cargaCrucigrama(tablero):
             tablero.setCelda(fil, col, lineas[fil][col])
     print('Crucigrama cargado')
 
-def AC3(Q):
+def AC3(Q,variables):
+    for v in variables:
+        if not v.dominio:
+            return False
     while Q:
         Vk,Vm = Q.pop(0)
         cambio = False
@@ -391,6 +412,43 @@ def backjumping(Variables, index):
 
     return False, conflictos_k.union({index}) # Fallo a la hroa de asignar y devuelve los conflictos actuales mas el indice que se prueba
     
+def ejecuta(algoritmo, tablero, almacen):
+    variables=creaVariables(tablero, almacen)
+    inicio=time.time()
+    res=True
+    if 'AC3' in algoritmo:
+        res=AC3(creaCola(variables),variables)
+    if res and algoritmo!='AC3':
+        if 'BK' in algoritmo:
+            res=backtracking(variables,0)
+        elif 'FC' in algoritmo:
+            res=FC(0,variables)
+        elif 'BJ' in algoritmo:
+            res,_=backjumping(variables,0)
+    fin=time.time()
+    return res, fin-inicio
+
+def comparaAlgoritmos(tablero, almacen):
+    print('TIEMPOS DEL TABLERO ACTUAL')
+    print('Algoritmo   Tiempo (s)   Resultado')
+    for algoritmo in ['AC3', 'FC', 'AC3+FC', 'AC3+BJ', 'AC3+BK', 'BJ', 'BK']:
+        res, tiempo = ejecuta(algoritmo, tablero, almacen)
+        print(f'{algoritmo:9}   {tiempo:10.4f}   {res}', flush=True)
+
+#Heurística MRV (no se usa en la entrega): primero las variables con el dominio más pequeño
+def ordenaMRV(variables):
+    maximo=0
+    for v in variables:
+        if len(v.dominio)>maximo:
+            maximo=len(v.dominio)
+    ordenadas=[]
+    for n in range(maximo+1):
+        for v in variables:
+            if len(v.dominio)==n:
+                ordenadas.append(v)
+    for i in range(len(ordenadas)):
+        ordenadas[i].nombre=i
+    return ordenadas
 
 #########################################################################  
 # Principal
@@ -399,7 +457,8 @@ def main():
     root= tkinter.Tk() #para eliminar la ventana de Tkinter
     root.withdraw() #se cierra
     pygame.init()
-    
+
+    global HEURISTICA
     reloj=pygame.time.Clock()
     
     print("Uso: python main.py --filas M --columnas N --dic archivo.txt")
@@ -435,10 +494,13 @@ def main():
     botBJ=pygame.Rect(xBoton, 4*hueco+3*altoBoton, 70, altoBoton)
     botVR=pygame.Rect(xBoton, 5*hueco+4*altoBoton, 70, altoBoton)
     #botones de guardar y cargar abajo a la izquierda
-    botGuardar=pygame.Rect(MARGEN+30, altoVentana-45, 100, 40)
-    botCargar=pygame.Rect(MARGEN+200, altoVentana-45, 100, 40)
+    botGuardar=pygame.Rect(MARGEN+5, altoVentana-45, 92, 40)
+    botCargar=pygame.Rect(MARGEN+100, altoVentana-45, 92, 40)
+    botTiempos=pygame.Rect(MARGEN+200, altoVentana-45, 92, 40)
+    botHeur=pygame.Rect(MARGEN+290, altoVentana-45, 92, 40)
 
-    tamFuenteBot=int(altoBoton//1.5)    
+    tamFuenteBot=int(altoBoton//1.5)  
+    fuenteBotPeq=pygame.font.Font(None, 28)  
     fuenteBot=pygame.font.Font(None, tamFuenteBot)
     fuenteCelda= pygame.font.Font(None, 70)
     
@@ -468,6 +530,7 @@ def main():
                         MessageBox.showwarning("Alerta", "No hay solución")
                     else:
                         escribeSolucion(tablero,variables) #pintamos la solucion
+
                 elif pulsaBoton(pos, botFC):
                     print('FC')
                     variables=creaVariables(tablero, almacen)
@@ -481,6 +544,7 @@ def main():
                         MessageBox.showwarning("Alerta", "No hay solución")
                     else:
                         escribeSolucion(tablero,variables)
+
                 elif pulsaBoton(pos, botAC3):
                     print('AC3')
                     variables=creaVariables(tablero, almacen)
@@ -488,7 +552,7 @@ def main():
                     imprimeVariables(variables)
                     Q = creaCola(variables)
                     inicio=time.time()
-                    res = AC3(Q)
+                    res = AC3(Q,variables)
                     fin=time.time()
                     print(f'Tiempo AC3: {fin-inicio:.4f} segundos')
                     print('DOMINIOS DESPUES DEL AC3')
@@ -522,6 +586,19 @@ def main():
                     print('VAR')
                     variables=creaVariables(tablero, almacen)
                     imprimeVariables(variables)
+                elif pulsaBoton(pos, botTiempos):
+                    print('TIEMPOS')
+                    comparaAlgoritmos(tablero, almacen)
+                elif pulsaBoton(pos, botHeur):
+                    if HEURISTICA=='Grado':
+                        HEURISTICA='MRV'
+                    elif HEURISTICA=='MRV':
+                        HEURISTICA='Ninguna'
+                    else:
+                        HEURISTICA='Grado'
+                    dominiosAC3=None
+                    fotoAC3=None
+                    print('HEURISTICA:', HEURISTICA)
                 elif pulsaBoton(pos, botGuardar):
                     guardaCrucigrama(tablero) #guardamos el tablero actual
                 elif pulsaBoton(pos, botCargar):
@@ -548,8 +625,11 @@ def main():
         pintarBoton(screen, fuenteBot, botAC3, "AC3")
         pintarBoton(screen, fuenteBot, botBJ, "BJ")
         pintarBoton(screen, fuenteBot, botVR, "Variables")
-        pintarBoton(screen, fuenteBot, botGuardar, "Guardar")
-        pintarBoton(screen, fuenteBot, botCargar, "Cargar")
+        pintarBoton(screen, fuenteBotPeq, botTiempos, "Tiempos")
+        pintarBoton(screen, fuenteBotPeq, botGuardar, "Guardar")
+        pintarBoton(screen, fuenteBotPeq, botCargar, "Cargar")
+        pintarBoton(screen, fuenteBotPeq, botHeur, HEURISTICA)
+
         #actualizar pantalla
         pygame.display.flip()
         reloj.tick(40)
