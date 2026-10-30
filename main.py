@@ -414,7 +414,7 @@ def backjumping(Variables, index):
     
 def ejecuta(algoritmo, tablero, almacen):
     variables=creaVariables(tablero, almacen)
-    inicio=time.time()
+    inicio=time.perf_counter() #apuntamos cuando empieza
     res=True
     if 'AC3' in algoritmo:
         res=AC3(creaCola(variables),variables)
@@ -425,7 +425,7 @@ def ejecuta(algoritmo, tablero, almacen):
             res=FC(0,variables)
         elif 'BJ' in algoritmo:
             res,_=backjumping(variables,0)
-    fin=time.time()
+    fin=time.perf_counter() #y cuando acaba
     return res, fin-inicio
 
 def comparaAlgoritmos(tablero, almacen):
@@ -433,7 +433,7 @@ def comparaAlgoritmos(tablero, almacen):
     print('Algoritmo   Tiempo (s)   Resultado')
     for algoritmo in ['AC3', 'FC', 'AC3+FC', 'AC3+BJ', 'AC3+BK', 'BJ', 'BK']:
         res, tiempo = ejecuta(algoritmo, tablero, almacen)
-        print(f'{algoritmo:9}   {tiempo:10.4f}   {res}', flush=True)
+        print(f'{algoritmo:9}   {tiempo:10.6f}   {res}', flush=True)
 
 #Heurística MRV (no se usa en la entrega): primero las variables con el dominio más pequeño
 def ordenaMRV(variables):
