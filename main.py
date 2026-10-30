@@ -22,7 +22,7 @@ TAM=60  #tamaño de la celda
 LLENA='*' 
 VACIA='-'
 
-HEURISTICA='Grado'
+HEURISTICA='Grado' #Orden en el que se cogen las variables: 'Grado', 'MRV' o 'Ninguna'. Se cambia con el botón de abajo
 
 #########################################################################
 # Detecta si se pulsa un botón
@@ -102,13 +102,13 @@ class Variable:
     def __init__(self, nombre, tipo, celdas, dominio):
         self.nombre=nombre
         self.tipo=tipo# 'h' o 'v'
-        self.celdas=celdas
-        self.fila=celdas[0][0]
+        self.celdas=celdas #Lista de (fila, col) que ocupa la palabra
+        self.fila=celdas[0][0] #Fila y columna de la primera celda
         self.col=celdas[0][1]
-        self.dominio=dominio
-        self.restricciones=[]
-        self.valor=None
-        self.podado=[]
+        self.dominio=dominio #Palabras que pueden ir en el hueco
+        self.restricciones=[] #Cruces con otras variables: (variable, posición en esta, posición en la otra)
+        self.valor=None #Palabra asignada, None si todavía no tiene
+        self.podado=[] #Lo que FC ha quitado del dominio y qué variable lo quitó
 
     def __str__(self):
         tipo='horizontal' if self.tipo=='h' else 'vertical'
@@ -184,11 +184,11 @@ def creaVariables(tablero, almacen):
 
     #Grado (la que se usa por defecto): primero las variables con más cruces
     ordenadas=[]
-    for n in range(len(variables), -1, -1):
+    for n in range(len(variables), -1, -1): #Va de más cruces a menos
         for v in variables:
             if len(v.restricciones)==n:
                 ordenadas.append(v)
-    for i in range(len(ordenadas)):
+    for i in range(len(ordenadas)): #Se renombran para que el nombre sea la posición en la lista, BJ usa el nombre como índice
         ordenadas[i].nombre=i
 
     return ordenadas
@@ -334,31 +334,33 @@ def cargaCrucigrama(tablero):
             tablero.setCelda(fil, col, lineas[fil][col])
     print('Crucigrama cargado')
 
+#AC3: quita de los dominios las palabras que no tienen ninguna palabra compatible en la variable con la que se cruzan
 def AC3(Q,variables):
-    for v in variables:
+    for v in variables: #Si alguna variable ya empieza sin palabras no hay solución
         if not v.dominio:
             return False
     while Q:
-        Vk,Vm = Q.pop(0)
+        Vk,Vm = Q.pop(0) #Se saca el primer arco de la cola
         cambio = False
-        for d in list(Vk.dominio):
+        for d in list(Vk.dominio): #Se recorre una copia porque se va borrando del dominio
             aux = False
-            for vm in Vm.dominio:
+            for vm in Vm.dominio: #Busca alguna palabra de Vm que pueda ir con d
                 if es_consistente(Vk, d, Vm, vm):
                     aux = True
                     break
-            if not aux:
+            if not aux: #d no tiene pareja en Vm, se quita
                 Vk.dominio.remove(d)
                 cambio = True
-        if not Vk.dominio:
+        if not Vk.dominio: #Dominio vacío, no hay solución
             return False
-        if cambio == True:
+        if cambio == True: #Vk ha perdido palabras, así que se vuelven a meter los arcos que llegan a Vk menos el de Vm
             for r in Vk.restricciones:
                 Vi = r[0]
                 if Vi is not Vm and (Vi, Vk) not in Q:
                     Q.append((Vi,Vk))
     return True
 
+#Crea la cola inicial de AC3 con un arco por cada cruce (variable, variable con la que se cruza)
 def creaCola(variables):
     Q = []
     for v in variables:
@@ -366,11 +368,13 @@ def creaCola(variables):
             Q.append((v, r[0]))
     return Q
 
+#Si antes se ha pasado AC3 sobre este mismo tablero, cambia los dominios por los que dejó AC3
 def aplicaDominiosAC3(variables, dominiosAC3, fotoAC3, tablero):
-    if dominiosAC3 is not None and fotoAC3 == str(tablero) and len(dominiosAC3) == len(variables):
+    if dominiosAC3 is not None and fotoAC3 == str(tablero) and len(dominiosAC3) == len(variables): #El tablero no puede haber cambiado desde el AC3
         for v, d in zip(variables, dominiosAC3):
-            v.dominio = list(d)
+            v.dominio = list(d) #Se copia para que el algoritmo no toque la lista guardada
 
+#Devuelve los índices de las variables anteriores que chocan con el valor que tiene ahora la variable index
 def variablesConflicto(Variables, index):
     Vk = Variables[index]
     conflictos = set()
@@ -379,17 +383,18 @@ def variablesConflicto(Variables, index):
         if Variables[i].valor == Vk.valor:
             conflictos.add(i)
 
-    for otra, posVk, posOtra in Vk.restricciones: #Compruba que la letra de la palbra guardada en una variable anterior coincide con la qu se esta probando ahora
+    for otra, posVk, posOtra in Vk.restricciones: #Compruba que la letra de la palabra guardada en una variable anterior coincide con la qu se esta probando ahora
         if otra.nombre < index and Vk.valor[posVk] != otra.valor[posOtra]:
             conflictos.add(otra.nombre)
     return conflictos
 
+#backjumping: como el backtracking, pero cuando falla salta hacia atrás a la variable que causa el conflicto en vez de a la anterior. Devuelve si hay solución y los conflictos
 def backjumping(Variables, index):
-    if index == len(Variables):
+    if index == len(Variables): #Ya se han asignado todas las variables
         return True, set()
 
     Vk = Variables[index]
-    conflictos_k = set()
+    conflictos_k = set() #Variables anteriores que le han dado problemas a Vk
 
     for v in Vk.dominio: #Prueba una a una todas las palabras del domino de la variable actual
         Vk.valor = v
@@ -412,41 +417,43 @@ def backjumping(Variables, index):
 
     return False, conflictos_k.union({index}) # Fallo a la hroa de asignar y devuelve los conflictos actuales mas el indice que se prueba
     
+#Lanza el algoritmo que se le pasa, que puede ir combinado (p.ej. 'AC3+FC'), y devuelve si hay solución y lo que ha tardado. No escribe la solución en el tablero
 def ejecuta(algoritmo, tablero, almacen):
-    variables=creaVariables(tablero, almacen)
-    inicio=time.perf_counter() #apuntamos cuando empieza
+    variables=creaVariables(tablero, almacen) #Variables nuevas en cada llamada, así cada algoritmo empieza con los dominios sin tocar
+    inicio=time.perf_counter_ns() #apuntamos cuando empieza
     res=True
-    if 'AC3' in algoritmo:
+    if 'AC3' in algoritmo: #Primero AC3 para reducir los dominios
         res=AC3(creaCola(variables),variables)
-    if res and algoritmo!='AC3':
+    if res and algoritmo!='AC3': #Si AC3 no ha fallado se hace la búsqueda, menos cuando solo se pide AC3
         if 'BK' in algoritmo:
             res=backtracking(variables,0)
         elif 'FC' in algoritmo:
             res=FC(0,variables)
         elif 'BJ' in algoritmo:
             res,_=backjumping(variables,0)
-    fin=time.perf_counter() #y cuando acaba
-    return res, fin-inicio
+    fin=time.perf_counter_ns() #y cuando acaba
+    return res, (fin-inicio)/1000 #pasamos de nanosegundos a microsegundos
 
+#Pasa todos los algoritmos por el mismo tablero y saca por consola una tabla con los tiempos
 def comparaAlgoritmos(tablero, almacen):
     print('TIEMPOS DEL TABLERO ACTUAL')
-    print('Algoritmo   Tiempo (s)   Resultado')
+    print('Algoritmo   Tiempo (µs)       Resultado')
     for algoritmo in ['AC3', 'FC', 'AC3+FC', 'AC3+BJ', 'AC3+BK', 'BJ', 'BK']:
         res, tiempo = ejecuta(algoritmo, tablero, almacen)
-        print(f'{algoritmo:9}   {tiempo:10.6f}   {res}', flush=True)
+        print(f'{algoritmo:9}   {tiempo:15.3f}   {res}', flush=True)
 
 #Heurística MRV (no se usa en la entrega): primero las variables con el dominio más pequeño
 def ordenaMRV(variables):
     maximo=0
-    for v in variables:
+    for v in variables: #Se busca el dominio más grande para saber hasta dónde contar
         if len(v.dominio)>maximo:
             maximo=len(v.dominio)
     ordenadas=[]
-    for n in range(maximo+1):
+    for n in range(maximo+1): #De dominio más pequeño a más grande
         for v in variables:
             if len(v.dominio)==n:
                 ordenadas.append(v)
-    for i in range(len(ordenadas)):
+    for i in range(len(ordenadas)): #Igual que en Grado, el nombre tiene que ser la posición para BJ
         ordenadas[i].nombre=i
     return ordenadas
 
@@ -458,7 +465,7 @@ def main():
     root.withdraw() #se cierra
     pygame.init()
 
-    global HEURISTICA
+    global HEURISTICA #Para poder cambiarla desde el botón
     reloj=pygame.time.Clock()
     
     print("Uso: python main.py --filas M --columnas N --dic archivo.txt")
@@ -500,7 +507,7 @@ def main():
     botHeur=pygame.Rect(MARGEN+290, altoVentana-45, 92, 40)
 
     tamFuenteBot=int(altoBoton//1.5)  
-    fuenteBotPeq=pygame.font.Font(None, 28)  
+    fuenteBotPeq=pygame.font.Font(None, 28) #Fuente más pequeña para los botones de abajo
     fuenteBot=pygame.font.Font(None, tamFuenteBot)
     fuenteCelda= pygame.font.Font(None, 70)
     
@@ -508,8 +515,8 @@ def main():
     #imprimeAlmacen(almacen)
     game_over=False
     tablero=Tablero(filas, cols)    
-    dominiosAC3 = None
-    fotoAC3 = None
+    dominiosAC3 = None #Dominios que dejó el último AC3, para usarlos luego en BK, FC y BJ
+    fotoAC3 = None #Cómo estaba el tablero cuando se hizo ese AC3
     while not game_over:
         for event in pygame.event.get():
             if event.type==pygame.QUIT:               
@@ -522,10 +529,10 @@ def main():
                     variables=creaVariables(tablero, almacen)
                     aplicaDominiosAC3(variables, dominiosAC3, fotoAC3, tablero)
                     imprimeVariables(variables)
-                    inicio=time.time() #apuntamos cuando empieza
+                    inicio=time.perf_counter_ns() #apuntamos cuando empieza
                     res=backtracking(variables,0) #empezamos por la primera variable
-                    fin=time.time() #y cuando acaba
-                    print(f'Tiempo BK: {fin-inicio:.4f} segundos') #mostramos lo que ha tardado
+                    fin=time.perf_counter_ns() #y cuando acaba
+                    print(f'Tiempo BK: {(fin-inicio)/1000:.3f} microsegundos') #mostramos lo que ha tardado
                     if res==False:
                         MessageBox.showwarning("Alerta", "No hay solución")
                     else:
@@ -536,10 +543,10 @@ def main():
                     variables=creaVariables(tablero, almacen)
                     aplicaDominiosAC3(variables, dominiosAC3, fotoAC3, tablero)
                     imprimeVariables(variables)
-                    inicio=time.time() #apuntamos cuando empieza
+                    inicio=time.perf_counter_ns() #apuntamos cuando empieza
                     res=FC(0,variables) #esta variable debe estar a falso si el problema no tiene solución
-                    fin=time.time() #y cuando acaba
-                    print(f'Tiempo FC: {fin-inicio:.4f} segundos') #mostramos lo que ha tardado
+                    fin=time.perf_counter_ns() #y cuando acaba
+                    print(f'Tiempo FC: {(fin-inicio)/1000:.3f} microsegundos') #mostramos lo que ha tardado
                     if res==False:
                         MessageBox.showwarning("Alerta", "No hay solución")
                     else:
@@ -551,17 +558,17 @@ def main():
                     print('DOMINIOS ANTES DEL AC3')
                     imprimeVariables(variables)
                     Q = creaCola(variables)
-                    inicio=time.time()
+                    inicio=time.perf_counter_ns()
                     res = AC3(Q,variables)
-                    fin=time.time()
-                    print(f'Tiempo AC3: {fin-inicio:.4f} segundos')
+                    fin=time.perf_counter_ns()
+                    print(f'Tiempo AC3: {(fin-inicio)/1000:.3f} microsegundos')
                     print('DOMINIOS DESPUES DEL AC3')
                     imprimeVariables(variables)
-                    if res==False:
+                    if res==False: #Si AC3 falla no se guarda nada
                         dominiosAC3=None
                         fotoAC3=None
                         MessageBox.showwarning("Alerta", "No hay solución")
-                    else:
+                    else: #Se guarda una copia de los dominios y el tablero tal como está
                         dominiosAC3 = []
                         for v in variables:
                             copia = list(v.dominio)
@@ -573,30 +580,30 @@ def main():
                     variables=creaVariables(tablero, almacen)
                     aplicaDominiosAC3(variables, dominiosAC3, fotoAC3, tablero)
                     imprimeVariables(variables)
-                    inicio=time.time() #apuntamos cuando empieza
+                    inicio=time.perf_counter_ns() #apuntamos cuando empieza
                     res,_=backjumping(variables,0) #esta variable debe estar a falso si el problema no tiene solución
-                    fin=time.time() #y cuando acaba
-                    print(f'Tiempo BJ: {fin-inicio:.4f} segundos') #mostramos lo que ha tardado
+                    fin=time.perf_counter_ns() #y cuando acaba
+                    print(f'Tiempo BJ: {(fin-inicio)/1000:.3f} microsegundos') #mostramos lo que ha tardado
                     if res==False:
                         MessageBox.showwarning("Alerta", "No hay solución")
                     else:
                         escribeSolucion(tablero,variables)
 
                 elif pulsaBoton(pos, botVR):
-                    print('VAR')
+                    print('VAR') #Solo muestra las variables con sus dominios, sin resolver
                     variables=creaVariables(tablero, almacen)
                     imprimeVariables(variables)
                 elif pulsaBoton(pos, botTiempos):
                     print('TIEMPOS')
                     comparaAlgoritmos(tablero, almacen)
-                elif pulsaBoton(pos, botHeur):
+                elif pulsaBoton(pos, botHeur): #Va rotando entre Grado, MRV y Ninguna
                     if HEURISTICA=='Grado':
                         HEURISTICA='MRV'
                     elif HEURISTICA=='MRV':
                         HEURISTICA='Ninguna'
                     else:
                         HEURISTICA='Grado'
-                    dominiosAC3=None
+                    dominiosAC3=None #Con otro orden los dominios guardados ya no son de las mismas variables
                     fotoAC3=None
                     print('HEURISTICA:', HEURISTICA)
                 elif pulsaBoton(pos, botGuardar):
